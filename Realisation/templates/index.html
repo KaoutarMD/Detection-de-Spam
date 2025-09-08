@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spam Detection Assistant</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f9f9f9;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        #chat-container {
+            width: 100%;
+            max-width: 600px;
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+        h2 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .chat-box {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 15px;
+            overflow-y: auto;
+            max-height: 300px;
+            background-color: #f5f5f5;
+        }
+        .message {
+            margin: 10px 0;
+            display: flex;
+        }
+        .message.user {
+            justify-content: flex-end;
+        }
+        .message span {
+            background: #e0e0e0;
+            padding: 10px;
+            border-radius: 10px;
+            max-width: 70%;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        .message.user span {
+            background: #007BFF;
+            color: #fff;
+        }
+        .message.bot span {
+            background: #28A745;
+            color: #fff;
+        }
+        .message.bot.spam span {
+            background: #FF4C4C;
+            color: #fff;
+        }
+        form {
+            display: flex;
+            align-items: center;
+        }
+        input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-right: 10px;
+            font-size: 16px;
+        }
+        button {
+            padding: 12px 20px;
+            border: none;
+            background: #007BFF;
+            color: #fff;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #777;
+        }
+        footer a {
+            color: #007BFF;
+            text-decoration: none;
+        }
+        footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div id="chat-container">
+        <h2>Spam Detection Assistant</h2>
+        <div class="chat-box" id="chat-box"></div>
+        <form id="chat-form">
+            <input type="text" id="user-input" placeholder="Type your message..." required>
+            <button type="submit"><i class="fas fa-paper-plane"></i> Send</button>
+        </form>
+        <footer>
+            
+        </footer>
+    </div>
+
+    <script>
+        const chatBox = document.getElementById('chat-box');
+        const chatForm = document.getElementById('chat-form');
+        const userInput = document.getElementById('user-input');
+
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const userMessage = userInput.value;
+
+            // Display user message
+            const userDiv = document.createElement('div');
+            userDiv.classList.add('message', 'user');
+            userDiv.innerHTML = `<span>${userMessage}</span>`;
+            chatBox.appendChild(userDiv);
+
+            // Clear input field
+            userInput.value = '';
+
+            // Call the Flask backend
+            const response = await fetch('/predict', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: userMessage })
+            });
+
+            const result = await response.json();
+            const isSpam = result.is_spam ? "Spam" : "Not Spam";
+
+            // Display bot response
+            const botDiv = document.createElement('div');
+            botDiv.classList.add('message', 'bot');
+            if (result.is_spam) {
+                botDiv.classList.add('spam');
+            }
+            botDiv.innerHTML = `<span>${isSpam}</span>`;
+            chatBox.appendChild(botDiv);
+
+            // Scroll to the bottom of the chat box
+            chatBox.scrollTop = chatBox.scrollHeight;
+        });
+    </script>
+</body>
+</html>

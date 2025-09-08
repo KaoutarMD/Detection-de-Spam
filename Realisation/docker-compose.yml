@@ -1,0 +1,12 @@
+
+
+version: '3.8'  # Spécifie la version du fichier de configuration Docker Compose.
+
+services:  # Déclare les services qui composent l'application.
+  
+  cassandra:  # Définition du service Cassandra.
+    image: cassandra:5.0  # Utilise l'image Cassandra version 5.0 depuis Docker Hub.
+    container_name: cassandra  # Donne un nom explicite au conteneur Cassandra.
+    ports:  
+      - "9042:9042"  # Mappe le port 9042 du conteneur (Cassandra) au port 9042 de l'hôte.
+
