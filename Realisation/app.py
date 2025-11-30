@@ -1,3 +1,11 @@
+# Importation des bibliothèques nécessaires :
+# - Flask : pour créer l’API web
+# - pandas : pour manipuler les données
+# - re : pour le nettoyage du texte
+# - cassandra.cluster : pour se connecter à Cassandra
+# - scikit-learn : vectorisation + modèle Naive Bayes
+# - NLTK : prétraitement linguistique (stopwords + lemmatisation)
+# - logging : pour journaliser les étapes importantes
 from flask import Flask, request, jsonify, render_template
 import pandas as pd
 import re
@@ -9,21 +17,41 @@ from nltk.stem import WordNetLemmatizer
 import nltk
 import logging
 
-# Download required NLTK data
+
+
+# Téléchargement automatique des ressources NLTK indispensables.
+# stopwords : pour supprimer les mots inutiles
+# wordnet : nécessaire pour la lemmatisation
 nltk.download('stopwords')
 nltk.download('wordnet')
+
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger()
 
-# NLTK setup for preprocessing
+
+
+# Initialisation du lemmatizer WordNet.
+# Le lemmatizer permet de réduire un mot à sa forme de base (ex : "running" → "run").
 lemmatizer = WordNetLemmatizer()
+
+
+# Chargement de la liste des stopwords anglais.
+# Ces mots sont retirés du texte pour ne conserver que les termes informatifs.
 stop_words = set(stopwords.words('english'))
+
 
 app = Flask(__name__)
 
+
 # 1. Connect to Cassandra
+# Fonction de connexion au cluster Cassandra.
+# - Se connecte à l’hôte local (127.0.0.1)
+# - Sélectionne le keyspace "gestionspam"
+# - Retourne une session pour exécuter des requêtes
+# Le logging permet de détecter immédiatement un problème de connexion.
 def connect_to_cassandra():
     try:
         cluster = Cluster(['127.0.0.1'])
@@ -35,7 +63,14 @@ def connect_to_cassandra():
         logger.error(f"Error connecting to Cassandra: {e}")
         exit()
 
+
 # 2. Fetch data from Cassandra
+# Récupère les données de la table "messages".
+# Chaque ligne contient :
+#   - content : le texte du message
+#   - label : 'spam' ou 'ham'
+# Transformation en DataFrame pandas pour faciliter l'analyse.
+# Conversion du label en variable binaire (1 = spam, 0 = ham).
 def fetch_data_from_cassandra(session):
     try:
         rows = session.execute("SELECT content, label FROM messages")
@@ -46,7 +81,16 @@ def fetch_data_from_cassandra(session):
         logger.error(f"Error fetching data: {e}")
         return pd.DataFrame()
 
+
+
 # 3. Preprocess emails
+# Fonction centrale de nettoyage du texte :
+# - Retire les caractères spéciaux
+# - Met tout en minuscules
+# - Supprime les espaces multiples
+# - Retire les stopwords
+# - Applique la lemmatisation
+# Ce prétraitement garantit que le modèle apprend sur un texte propre et normalisé.
 def preprocess_email(email):
     email = re.sub(r'\W', ' ', email)  # Remove non-alphanumeric characters
     email = email.lower()  # Convert to lowercase
@@ -54,7 +98,16 @@ def preprocess_email(email):
     email = ' '.join([lemmatizer.lemmatize(word) for word in email.split() if word not in stop_words])
     return email
 
-# Fonction pour entraîner le modèle de détection de spam
+
+# Fonction d'entraînement du modèle :
+# Étape 1 : Prétraiter chaque email (application de preprocess_email)
+# Étape 2 : Vectoriser les textes avec CountVectorizer
+#           -> ngram_range=(1,2) permet de capturer des unigrammes + bigrammes
+#              (améliore la compréhension du contexte)
+# Étape 3 : Entraîner le modèle Naive Bayes (MultinomialNB)
+# Retour :
+#   - le modèle entraîné
+#   - le vectorizer, nécessaire pour transformer de nouveaux emails
 def train_spam_detector(data):
     logger.info("Entraînement du modèle de détection de spam...")
 
@@ -75,12 +128,21 @@ def train_spam_detector(data):
     return model, vectorizer
 
 
-# Flask route to render the HTML page
+# Route principale ('/') :
+# Renvoie la page HTML frontend (index.html)
+# Cette page permet à l'utilisateur de saisir un email pour analyse.
 @app.route("/")
 def index():
     return render_template("index.html")
 
-# Flask route to predict if an email is spam
+
+
+# Route '/predict' :
+# - Récupère le texte envoyé en JSON
+# - Nettoie le texte avec preprocess_email()
+# - Transforme le texte en vecteur avec le vectorizer entraîné
+# - Utilise le modèle Naive Bayes pour prédire spam / non-spam
+# - Renvoie un JSON : {"is_spam": true/false}
 @app.route("/predict", methods=["POST"])
 def predict():
     email_text = request.json.get("email", "")
@@ -105,3 +167,4 @@ if __name__ == "__main__":
         app.run(debug=True)
     else:
         logger.error("No data available in the database.")
+
